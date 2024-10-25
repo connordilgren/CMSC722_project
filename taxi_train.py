@@ -26,7 +26,7 @@ def rolling_avg(x, size=100):
 
 # hyperparameters
 learning_rate = 0.01
-n_episodes = 1_000
+n_episodes = 10_000
 start_epsilon = 1.0
 epsilon_decay = start_epsilon / (n_episodes / 2)  # reduce the exploration over time
 final_epsilon = 0.1
@@ -46,9 +46,10 @@ agent = TaxiAgent(
 
 for goal_square_color in ['red', 'green', 'yellow', 'blue']:
     nav_env.goal_square_color = goal_square_color
+    agent.epsilon = start_epsilon
 
     for episode in tqdm(range(n_episodes)):
-        obs, info = nav_env.reset()
+        obs, info, _, _ = nav_env.reset()
         done = False
 
         episode_len = 0

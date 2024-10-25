@@ -64,12 +64,13 @@ class TaxiAgent:
         with open(q_values_gs_path, 'wb') as f:
             pickle.dump(self.q_values_gs, f)
 
-    def get_action(self, obs: int, goal_square_color: str) -> int:
+    def get_action(self, obs: tuple, goal_square_color: str) -> int:
         """
         Returns the best action with probability (1 - epsilon)
         otherwise a random action with probability epsilon to ensure exploration.
 
-        obs is [taxi_row, taxi_col, passenger_loc, destination]
+        obs is (taxi_row, taxi_col)
+        goal_square_color is the square the taxi wants to get to
         """
         # with probability epsilon return a random action to explore the environment
         if np.random.random() < self.epsilon:
