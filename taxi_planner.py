@@ -1,9 +1,8 @@
-import random
-
 import gtpyhop
 import gymnasium as gym
 
 from taxi_env import NavigateTaxiEnv
+from taxi_agent import TaxiAgent
 
 
 ###############################################################################
@@ -50,6 +49,16 @@ def coord_to_color_ind(coord):
     return c2ci.get(coord, -1)
 
 
+def coord_to_color(coord):
+    c2c = {
+        (0, 0): 'red',
+        (0, 4): 'green',
+        (4, 0): 'yellow',
+        (4, 3): 'blue'
+    }
+    return c2c.get(coord, -1)
+
+
 def is_a(variable, type):
     """
     from simple_hgn.py in GTPyhop's examples
@@ -87,6 +96,36 @@ gtpyhop.declare_actions(pick_up, drop_off, navigate)
 
 
 ###############################################################################
+# Commands:
+def c_pick_up(state, p, pass_taxi_loc):
+    _, _, _, _, _ = nav_env.step(4)
+
+    state.loc[p] = pass_taxi_loc
+    return state
+
+
+def c_drop_off(state, p, gs):
+    _, _, _, _, _ = nav_env.step(5)
+
+    state.loc[p] = gs
+    return state
+
+
+def c_navigate(state, t, coord):
+    obs = state.loc[t]
+    goal_square_color = coord_to_color(coord)
+    while obs != coord:
+        action = agent.get_action(obs, goal_square_color)
+        obs, _, _, _, _ = nav_env.step(action)
+
+    state.loc[t] = coord
+    return state
+
+
+gtpyhop.declare_commands(c_pick_up, c_drop_off, c_navigate)
+
+
+###############################################################################
 # Helper functions for methods:
 def get_taxi():
     t = rigid.types['taxi'][0]
@@ -103,7 +142,8 @@ def m_pick_up(state, p, pass_taxi_loc):
 
 
 def m_drop_off(state, p, gs):
-    if is_a(p, 'passenger') and is_a(gs, 'color_squares') and state.loc[p] == '4':
+    if is_a(p, 'passenger') and is_a(gs, 'color_squares') \
+       and state.loc[p] == '4':
         t = get_taxi()
         t_color_ind = coord_to_color_ind(state.loc[t])
         if t_color_ind == gs:
@@ -126,21 +166,35 @@ def m_full_service(state, p, gs):
                     ('loc', p, gs)]
 
 
-gtpyhop.declare_unigoal_methods('loc', m_pick_up, m_drop_off, m_navigate, m_full_service)
+gtpyhop.declare_unigoal_methods('loc',
+                                m_pick_up,
+                                m_drop_off,
+                                m_navigate,
+                                m_full_service)
 
 
 ###############################################################################
 # Run the problem
 
-# initial state
+# initialial environment, agent
+env = gym.make("Taxi-v3")
+nav_env = NavigateTaxiEnv(env, 'red')
+obs_simple, info, passenger_loc, destination = nav_env.reset()
+
+agent = TaxiAgent(
+    nav_env,
+    learning_rate=0,
+    initial_epsilon=0,
+    epsilon_decay=0,
+    final_epsilon=0,
+    q_values_gs_path='q_values_gs.pkl'
+)
+
 state0 = gtpyhop.State('state0')
 state0.loc = {
-    'taxi_1': (4, 4),
-    'passenger_1': '1',
+    'taxi_1': (obs_simple[0], obs_simple[1]),
+    'passenger_1': str(passenger_loc),
 }
 
-gtpyhop.find_plan(state0, [('loc', 'passenger_1', '0')])
-gtpyhop.find_plan(state0, [('loc', 'passenger_1', '1')])
-gtpyhop.find_plan(state0, [('loc', 'passenger_1', '2')])
-gtpyhop.find_plan(state0, [('loc', 'passenger_1', '3')])
-# gtpyhop.run_lazy_lookahead(state0, ['loc', 'passenger_1', 1])
+# run lazy lookahead
+gtpyhop.run_lazy_lookahead(state0, [('loc', 'passenger_1', str(destination))])
