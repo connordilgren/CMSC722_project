@@ -12,8 +12,9 @@ class TaxiAgent:
         initial_epsilon: float,
         epsilon_decay: float,
         final_epsilon: float,
-        discount_factor: float = 0.95,
-        q_values_gs_path: str = None
+        discount_factor: float,
+        q_values_gs_path: str = None,
+        num_steps: int = 0
     ):
         """Initialize a Reinforcement Learning agent with an empty dictionary
         of state-action values (q_values), a learning rate and an epsilon.
@@ -50,6 +51,8 @@ class TaxiAgent:
 
         self.training_error = defaultdict(list)
 
+        self.num_steps = num_steps
+
     def initialize_q_values_gs(self):
         return defaultdict(self.initialize_q_values)
 
@@ -72,6 +75,7 @@ class TaxiAgent:
         obs is (taxi_row, taxi_col)
         goal_square_color is the square the taxi wants to get to
         """
+        self.num_steps += 1
         # with probability epsilon return a random action to explore the environment
         if np.random.random() < self.epsilon:
             return self.nav_env.env.action_space.sample()

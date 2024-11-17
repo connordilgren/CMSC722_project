@@ -1,5 +1,9 @@
+import os
+import re
+
 import gtpyhop
 import gymnasium as gym
+import pandas as pd
 
 from taxi_env import NavigateTaxiEnv
 from taxi_agent import TaxiAgent
@@ -101,6 +105,7 @@ def c_pick_up(state, p, pass_taxi_loc):
     _, _, _, _, _ = nav_env.step(4)
 
     state.loc[p] = pass_taxi_loc
+    agent.num_steps += 1
     return state
 
 
@@ -108,6 +113,7 @@ def c_drop_off(state, p, gs):
     _, _, _, _, _ = nav_env.step(5)
 
     state.loc[p] = gs
+    agent.num_steps += 1
     return state
 
 
@@ -176,25 +182,52 @@ gtpyhop.declare_unigoal_methods('loc',
 ###############################################################################
 # Run the problem
 
-# initialial environment, agent
-env = gym.make("Taxi-v3")
-nav_env = NavigateTaxiEnv(env, 'red')
-obs_simple, info, passenger_loc, destination = nav_env.reset()
 
-agent = TaxiAgent(
-    nav_env,
-    learning_rate=0,
-    initial_epsilon=0,
-    epsilon_decay=0,
-    final_epsilon=0,
-    q_values_gs_path='q_values_gs.pkl'
-)
+q_values_gs_paths = os.listdir('.\\q_values')
+df = pd.DataFrame({
+    'learning_rate': [],
+    'epsilon_decay': [],
+    'discount_factor': [],
+    'num_steps': []
+    })
 
-state0 = gtpyhop.State('state0')
-state0.loc = {
-    'taxi_1': (obs_simple[0], obs_simple[1]),
-    'passenger_1': str(passenger_loc),
-}
+for q_values_gs_path in q_values_gs_paths:
 
-# run lazy lookahead
-gtpyhop.run_lazy_lookahead(state0, [('loc', 'passenger_1', str(destination))])
+    # initialial environment, agent
+    env = gym.make("Taxi-v3")
+    nav_env = NavigateTaxiEnv(env, 'red')
+    # obs_simple, info, passenger_loc, destination = nav_env.reset()
+
+    agent = TaxiAgent(
+        nav_env,
+        learning_rate=0,
+        initial_epsilon=0.1,
+        epsilon_decay=0,
+        final_epsilon=0,
+        discount_factor=0,
+        q_values_gs_path=f".\\q_values\\{q_values_gs_path}"
+    )
+
+    for _ in range(100):
+        obs_simple, info, passenger_loc, destination = nav_env.reset()
+
+        state0 = gtpyhop.State('state0')
+        state0.loc = {
+            'taxi_1': (obs_simple[0], obs_simple[1]),
+            'passenger_1': str(passenger_loc),
+        }
+
+        # run lazy lookahead
+        agent.num_steps = 0
+        gtpyhop.run_lazy_lookahead(state0, [('loc', 'passenger_1', str(destination))])
+        new_row = pd.DataFrame({
+            'learning_rate': [float(re.search(r'lr([0-9.]+)_', q_values_gs_path).group(1))],
+            'epsilon_decay': [float(re.search(r'ed([0-9.]+)_', q_values_gs_path).group(1))],
+            'discount_factor': [float(re.search(r'df([0-9.]+)_', q_values_gs_path).group(1))],
+            'num_steps': int(agent.num_steps)
+        })
+        df = pd.concat([df, new_row], ignore_index=True)
+
+# save results
+with open('eval_results.pkl', 'wb') as f:
+    df.to_pickle(f)
